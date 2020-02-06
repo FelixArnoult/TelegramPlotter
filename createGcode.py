@@ -37,7 +37,7 @@ def draw(outputfile, drawSvg):
         gcodes.append(gcodeToAdd)
     file = ''
     for gcode in gcodes:
-        writeOnFile(outputfile, '\n'.join(str(g) for g in gcode))
+        writeOnFile(outputfile, gcode)
 
 def init(outputfile):
     init = ["$H",   #Home
@@ -53,7 +53,7 @@ def end(outputfile):
 
 def writeOnFile(outputfile, content):
     for line in content :
-        outputfile.write(line + '\n')
+        outputfile.write(str(line) + '\n')
 
 # if __name__ == '__main__':
 #     outputfile = open("output.gcode","w")
