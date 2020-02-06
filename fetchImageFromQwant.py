@@ -4,6 +4,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import urllib
 import random
 
@@ -12,9 +14,13 @@ numberOfImage = 5
 
 
 def getBrowser():
-    options = webdriver.ChromeOptions()
-    options.add_argument('headless')
-    return webdriver.Chrome(chrome_options=options)
+    binary = r'/usr/bin/firefox'
+    cap = DesiredCapabilities().FIREFOX
+    cap["marionette"] = True
+    options = Options()
+    options.headless = True
+    options.binary = binary
+    return webdriver.Firefox(capabilities=cap, firefox_options=options, executable_path=r'/usr/local/bin/geckodriver')
 
 def selectRandomImage(images):
     selected = random.randint(0, len(images)-1)
