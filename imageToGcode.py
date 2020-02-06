@@ -14,9 +14,14 @@ def convertImageToJpg(fileCreated):
     return convertedFile
 
 def convertImageToSvg(fileCreated):
-    convertedFile = [fileCreated[-1][0], 'svg']
-    subprocess.run(["convert", '.'.join(fileCreated[-1]), '-resize', '3700x2000', '.'.join(convertedFile)])
-    return convertedFile
+    convertedFiles = []
+    tempFile = [fileCreated[-1][0], 'pnm']
+    subprocess.run(["convert", '.'.join(fileCreated[-1]), '-resize', '3700x2000', '.'.join(tempFile)])
+    convertedFiles.append(tempFile)
+    outputFile = [fileCreated[-1][0], 'svg']
+    subprocess.run(["potrace", '.'.join(convertedFiles[-1]), '-s', '-o', '.'.join(outputFile)])
+    convertedFiles.append(outputFile)
+    return convertedFiles
 
 def deleteFile(fileCreated):
     for file in fileCreated:
@@ -33,7 +38,7 @@ if __name__ == '__main__':
 
         fileCreated.append(procImg.detectEdge(fileCreated))
 
-        fileCreated.append(convertImageToSvg(fileCreated))
+        fileCreated.extend(convertImageToSvg(fileCreated))
 
         crtGc.writeGcode(fileCreated, ["output", "gcode"])
 

@@ -15,7 +15,7 @@ def writeGcode(inputfile, outputfile):
     draw(outputfile, inputfile)
     end(outputfile)
     outputfile.close()
-    return gcodeFile
+    return outputfile
 
 
 def draw(outputfile, drawSvg):
