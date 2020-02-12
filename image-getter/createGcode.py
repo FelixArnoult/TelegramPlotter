@@ -10,11 +10,11 @@ slowMove = 3000 #mm/min
 
 def writeGcode(inputfile, outputfile):
     # outputfile = ["output", "gcode"]
-    outputfile = open('.'.join(outputfile),"w")
-    init(outputfile)
-    draw(outputfile, inputfile)
-    end(outputfile)
-    outputfile.close()
+    gcodeFile = open('.'.join(outputfile),"w")
+    init(gcodeFile)
+    draw(gcodeFile, inputfile)
+    end(gcodeFile)
+    gcodeFile.close()
     return outputfile
 
 

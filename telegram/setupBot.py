@@ -14,11 +14,9 @@ bot.
 """
 
 import logging
-
-import ImageHandeler
-import threading
-
+import subprocess
 import sys
+import os
 # the mock-0.3.1 dir contains testcase.py, testutils.py & mock.py
 sys.path.append('../image-getter')
 
@@ -98,7 +96,7 @@ def selectPhoto(update, context):
     logger.info("User %s choose %s to gcode", user.first_name, files[selected])
     files[selected], files[-1] = files[-1], files[selected]
     files.extend(cvtImg.convertImageToSvg(files))
-    files.extend(crtGc.writeGcode(files, [files[-1][0], "gcode"]))
+    files.extend(crtGc.writeGcode(files, ['./output', "gcode"]))
 
     update.message.reply_text('Gcode file created\nSend it to printer ?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     context.chat_data['files'] = files
@@ -107,6 +105,9 @@ def selectPhoto(update, context):
 
 def launchPrint(update, context):
     if(update.message.text == 'UII'):
+        streamer = os.environ["DRAWING_BOT_STREAMER"]
+        args = ['.'.join(['./output', "gcode"]), "/dev/ttyACM0"]
+        returned_value = subprocess.call(streamer +' ' + ' '.join(args), shell=True)
         update.message.reply_text('Print running ...')
     else:
         update.message.reply_text('Maybe later')
@@ -138,7 +139,7 @@ def config(update, context):
 def sumup(update, context):
     bot = context.bot
     query = update.callback_query
-    logger.info("User %s asked for a sumup.", user.first_name)
+    # logger.info("User %s asked for a sumup.", update.callback_query.message.from.first_name)
 
     reply = "Sumup :\n"
     if(context.user_data.get(config_kw[0], None) != None):
@@ -160,7 +161,7 @@ def sumup(update, context):
 def chooseConfig(update, context):
     bot = context.bot
     query = update.callback_query
-    logger.info("User %s started to edit %s", user.first_name, query.data)
+    # logger.info("User %s started to edit %s", update.callback_query.message.from.first_name, query.data)
 
     context.user_data['choice'] = query.data
     context.user_data['current_kb'] = dico_kb.get(query.data)
@@ -177,7 +178,7 @@ def chooseConfig(update, context):
 def setConfig(update, context):
     bot = context.bot
     query = update.callback_query
-    logger.info("User %s changed %s = %s", user.first_name, context.user_data['choice'], query.data)
+    # logger.info("User %s changed %s = %s", update.callback_query.message.from.first_name, context.user_data['choice'], query.data)
 
     choice = context.user_data['choice']
     current_kb = context.user_data['current_kb']
@@ -202,7 +203,7 @@ def main():
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
     pp = PicklePersistence(filename='conversationbot')
-    updater = Updater("TOKEN", persistence=pp, use_context=True)
+    updater = Updater(os.environ["TELEGRAM_TOKER"], persistence=pp, use_context=True)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher

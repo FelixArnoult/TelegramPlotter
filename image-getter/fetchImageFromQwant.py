@@ -55,7 +55,7 @@ def fetchImages(fileCreated, keyword, number=defaultNumberOfImage):
         try :
             fetchedImages.append(saveImage(url, [name, imgtype]))
             counter = counter + 1
-            if counter >= number :
+            if counter > number :
                 break
         except Exception as e:
             print(e)
