@@ -7,9 +7,7 @@ from selenium.common.exceptions import TimeoutException
 import urllib.request
 import random
 
-numberOfImage = 5
-
-
+defaultNumberOfImage = 5
 
 def getBrowser():
     options = webdriver.ChromeOptions()
@@ -21,13 +19,13 @@ def selectRandomImage(images):
     images[selected], images[-1] = images[-1], images[selected]
     return images
 
-def getImage(fileCreated, keyword):
-    images = fetchImages(fileCreated, keyword)
-    selectRandomImage(images)
+def getImage(fileCreated, keyword, number=defaultNumberOfImage):
+    images = fetchImages(fileCreated, keyword, number)
+    # selectRandomImage(images)
     # print(images)
     return images
 
-def fetchImages(fileCreated, keyword):
+def fetchImages(fileCreated, keyword, number=defaultNumberOfImage):
     fetchedImages = []
     url = "https://www.qwant.com/?q=coloriage%20"+keyword+"&t=images"#&color=monochrome&imagetype=transparent"
     print(url)
@@ -45,12 +43,12 @@ def fetchImages(fileCreated, keyword):
 
     for x in browser.find_elements_by_xpath("//div[contains(@class, 'result--images')]"):
         name = './image/' + str(keyword) + str(counter)
-        counter = counter + 1
         url = x.find_element_by_tag_name('a').get_attribute('href')
         imgtype = url.split(".").pop()
         try :
             fetchedImages.append(saveImage(url, [name, imgtype]))
-            if counter >= numberOfImage :
+            counter = counter + 1
+            if counter >= number :
                 break
         except Exception as e:
             print(e)
