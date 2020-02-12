@@ -8,7 +8,6 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import urllib
 import urllib.request
->>>>>>> 468f32e... Correction import
 import random
 
 defaultNumberOfImage = 5
