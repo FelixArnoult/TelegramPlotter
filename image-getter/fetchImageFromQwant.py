@@ -26,20 +26,24 @@ def selectRandomImage(images):
     images[selected], images[-1] = images[-1], images[selected]
     return images
 
-def getImage(fileCreated, keyword, number=defaultNumberOfImage):
-    images = fetchImages(fileCreated, keyword, number)
+def getImage(keyword, number=defaultNumberOfImage):
+    images = fetchQwantImages(keyword, number)
     # selectRandomImage(images)
     # print(images)
     return images
 
-def fetchImages(fileCreated, keyword, number=defaultNumberOfImage):
+#mode = 0 -> recherche "coloriage + keyword"
+#mode = 1 -> recherche "keyword" en monochrome & transparent
+def fetchQwantImages(keyword, number=defaultNumberOfImage, mode=0):
     fetchedImages = []
-    url = "https://www.qwant.com/?q=coloriage%20"+keyword+"&t=images"#&color=monochrome&imagetype=transparent"
+    if(not mode):
+        url = "https://www.qwant.com/?q="+keyword+"&t=images&color=monochrome&imagetype=transparent"
+    else :
+        url = "https://www.qwant.com/?q=coloriage%20"+keyword+"&t=images"
     print(url)
     browser = getBrowser()
     browser.get(url)
     counter = 0
-    succounter = 0
     timeout = 10
     try:
         element_present = EC.presence_of_element_located((By.CLASS_NAME, 'result--images'))
@@ -55,7 +59,7 @@ def fetchImages(fileCreated, keyword, number=defaultNumberOfImage):
         try :
             fetchedImages.append(saveImage(url, [name, imgtype]))
             counter = counter + 1
-            if counter > number :
+            if counter >= number :
                 break
         except Exception as e:
             print(e)
@@ -73,5 +77,6 @@ def saveImage(url, outfile):
     return outfile
 
 
-# if __name__ == '__main__':
-#     fetchImages(sys.argv[1])
+if __name__ == '__main__':
+    # first arg is keyword, second is number of image to dl, third is the mode
+    print(fetchQwantImages(sys.argv[1], int(sys.argv[2]), int(sys.argv[3])))
