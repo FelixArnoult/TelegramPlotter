@@ -20,6 +20,7 @@ import logging
 import subprocess
 import sys
 import os
+import time
 # the mock-0.3.1 dir contains testcase.py, testutils.py & mock.py
 sys.path.append('../image-getter')
 
@@ -30,7 +31,7 @@ import createGcode as crtGc
 
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup,
-                        InlineKeyboardButton)
+                        InlineKeyboardButton, File)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler, CallbackQueryHandler, PicklePersistence)
 
@@ -41,7 +42,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     # filename='drawing_telegram2.log')
 
 logger = logging.getLogger(__name__)
-KEYWORD, SELECTPHOTO, PRINTING, LAUNCHPRINT = range(4)
+AVAILABLE, SEARCHING, COMPUTING, PRINTING = range(4)
 HOME, SET = range(2)
 
 config_kw = ["SEARCH_ENGINE","SEARCH_TYPE","IMAGE_PROCESS","NB_DISPLAYED_PHOTO", 'SUMUP']
@@ -52,7 +53,6 @@ dico_kb = { config_kw[0]: ["Google", "Qwant"],
 
 DEFAULT_SETTINGS = {'SEARCH_ENGINE': 1, 'IMAGE_PROCESS': 1, 'SEARCH_TYPE': 1, 'NB_DISPLAYED_PHOTO': 3}
 
-# NUMBER = ["\u0030", "\u0031"]
 
 def build_menu(buttons,
                n_cols,
@@ -73,84 +73,90 @@ class DrawingTelegram(object):
         self.IMAGE_GETTER = './subprocessTest.py'
         self.fileCreated = []
         self.fetchImage_pool = Pool()
-        self.isFetchingImage = False
+        self.state = AVAILABLE
 
 
-
-    def cancel(self, update, context):
-        print("alo")
-        # self.fetchImage_pool = None
-        # self.printing_thread = None
-        logger.warning("canceling%s", 'test')
-        return ConversationHandler.END
-
-    def start(self, update, context):
-        update.message.reply_text(
-            'Hi! My name is BoardPlotter Bot. I can draw whatever you want. '
-            'Send /cancel to stop talking to me.\n\n'
-            'What do you want me to draw?')
-        return KEYWORD
-
-
-    def keyword(self, update, context):
+    def fetchImage(self, update, context):
         user = update.message.from_user
-        logger.info("User %s search %s", user.first_name, update.message.text)
+        search_text = context.args[0]
+        logger.info("User %s search %s", user.first_name, search_text)
         # print(self.fetchImage_pool.ready())
-        if(not self.isFetchingImage):
+        if(self.state == AVAILABLE):
+            self.state = SEARCHING
             update.message.reply_text('Hmmm, I\'ll see what I can find ...\nLet me few seconds ...')
             callback = lambda result: self.fetchImageDone(update, context, result)
             nbPhoto, searchType = getUserParam(context.user_data, ["NB_DISPLAYED_PHOTO", "SEARCH_TYPE"])
             print(nbPhoto)
             print(searchType)
-            args = (update.message.text, nbPhoto, searchType)
+            args = (search_text, nbPhoto, searchType)
             self.fetchImage_pool.apply_async(getImg.fetchQwantImages, args, callback=callback)
-            self.isFetchingImage = True
         else:
-            update.message.reply_text('Recherche en cours')
-
-        return KEYWORD
+            update.message.reply_text('Not available')
 
     def fetchImageDone(self, update, context, result):
         for number, r in enumerate(result):
-            update.message.reply_photo(caption='{}'.format(number), photo=open('.'.join(r), 'rb'))
-        update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup([list(map(lambda x: str(x), range(len(result))))], one_time_keyboard=True))
-        # update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup(NUMBER, one_time_keyboard=True))
+            update.message.reply_photo(photo=open('.'.join(r), 'rb'))
+        # update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup([list(map(lambda x: '~'+str(x), range(len(result))))], one_time_keyboard=True))
+        update.message.reply_text('Reply to one of the images with command /print')
         self.fileCreated.extend(result)
-        self.isFetchingImage = False
+        self.state = AVAILABLE
 
     def selectPhoto(self, update, context):
+
         reply_keyboard = [['UII', 'NOO']]
+        if(self.state == AVAILABLE):
+            self.state = COMPUTING
+            self.fileCreated.extend([["./image/" + str(int(time.time())), 'jpg']])
+            photo_file = getPhoto(update)
+            photo_file.download(".".join(self.fileCreated[-1]))
 
-        user = update.message.from_user
-        selected = int(update.message.text)
-        logger.info("User %s choose %s to gcode", user.first_name, self.fileCreated[selected])
-        self.fileCreated[selected], self.fileCreated[-1] = self.fileCreated[-1], self.fileCreated[selected]
-        self.fileCreated.extend(cvtImg.convertImageToSvg(self.fileCreated))
-        self.fileCreated.extend(crtGc.writeGcode(self.fileCreated, [[self.fileCreated[-1][0], "gcode"]]))
+            self.fileCreated.extend(cvtImg.convertImageToSvg(self.fileCreated))
+            self.fileCreated.extend(crtGc.writeGcode(self.fileCreated, [[self.fileCreated[-1][0], "gcode"]]))
+            update.message.reply_document(document=open(".".join(self.fileCreated[-1]), 'rb'))
+            update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup([["/print last"]], one_time_keyboard=True))
+            self.state = AVAILABLE
 
-        update.message.reply_text('Gcode file created\nSend it to printer ?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-
-        return LAUNCHPRINT
+        else:
+            update.message.reply_text('Not available')
 
     def launchPrint(self, update, context):
-        if(update.message.text == 'UII'):
+        if(self.state == AVAILABLE):
+            self.state = PRINTING
+            self.fileCreated.extend([["./image/" + str(int(time.time())), 'gcode']])
+            gcode_file = getGcode(update)
+            gcode_file.download(".".join(self.fileCreated[-1]))
             args = (["/usr/bin/python3", self.STREAM, '.'.join(self.fileCreated[-1]), "/dev/ttyACM0"],)
-            print(args)
             update.message.reply_text('Print running ...')
             callback = lambda result: self.printingDone(update, context, result)
             self.fetchImage_pool.apply_async(subprocess.call, args, callback=callback)
-
         else:
-            update.message.reply_text('Maybe later')
+            update.message.reply_text('Not available')
 
         return ConversationHandler.END
 
     def printingDone(self, update, context, result):
-        print("done")
         update.message.reply_text('Print done !')
         args = (['rm'] + list('.'.join(file) for file in self.fileCreated),)
         self.fetchImage_pool.apply_async(subprocess.call, args)
+        self.fileCreated = []
+        self.state = AVAILABLE
 
+def start(self, update, context):
+    update.message.reply_text(
+        'Hi! My name is BoardPlotter Bot. I can draw whatever you want. '
+        'Send /cancel to stop talking to me.\n\n'
+        'What do you want me to draw?')
+    # return KEYWORD
+
+def getPhoto(update):
+    if(update.message.reply_to_message):
+        return update.message.reply_to_message.photo[-1].get_file()
+    return update.message.photo[-1].get_file()
+
+def getGcode(update):
+    if(update.message.reply_to_message):
+        return update.message.reply_to_message.document.get_file()
+    return update.message.document.get_file()
 
 def getUserParam(store, param):
     ret = []
@@ -237,7 +243,6 @@ def error(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
-
 def main():
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
@@ -247,28 +252,22 @@ def main():
 
     pp = PicklePersistence(filename='DrawingTelegram')
     updater = Updater(os.environ["TELEGRAM_TOKER"], persistence=pp, use_context=True)
-    print(pp.get_user_data())
+    # print(pp.get_user_data())
         # for i in PicklePersistence(filename='DrawingTelegram').get_bot_data():
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
     # Add conversation handler with the states KEYWORD, SELECTPHOTO, LAUNCHPRINT and BIO
-    conv_draw = ConversationHandler(
-        entry_points=[CommandHandler('draw', myBot.start)],
 
-        states={
-            KEYWORD: [  MessageHandler(Filters.regex('^[0-9]$'), myBot.selectPhoto),
-                        MessageHandler(Filters.text, myBot.keyword)],
+    dp.add_handler(CommandHandler("search", myBot.fetchImage,
+                                  pass_args=True))
 
-            # SELECTPHOTO: [MessageHandler(Filters.regex('^[0-9]+$'), selectPhoto)],
-            # PRINTING: [MessageHandler(Filter.all, checkPrintingStatus)],
+    dp.add_handler(MessageHandler((Filters.reply & Filters.regex('^\/gcode$')), myBot.selectPhoto))
+    dp.add_handler(MessageHandler((Filters.photo & Filters.caption(["/gcode"])), myBot.selectPhoto))
 
-            LAUNCHPRINT: [MessageHandler(Filters.regex('^(UII|NOO)$'), myBot.launchPrint)]
-        },
-
-        fallbacks=[CommandHandler('cancel', myBot.cancel)]
-    )
+    dp.add_handler(MessageHandler((Filters.reply & Filters.regex('^\/print$')), myBot.launchPrint))
+    dp.add_handler(MessageHandler((Filters.photo & Filters.caption(["/print"])), myBot.launchPrint))
 
     conv_config = ConversationHandler(
         entry_points=[CommandHandler('config', config)],
@@ -282,7 +281,7 @@ def main():
     )
 
 
-    dp.add_handler(conv_draw)
+    # dp.add_handler(conv_draw)
     dp.add_handler(conv_config)
 
     # log all errors
