@@ -49,9 +49,13 @@ def fetchQwantImages(keyword, number=defaultNumberOfImage, mode=0):
         element_present = EC.presence_of_element_located((By.CLASS_NAME, 'result--images'))
         WebDriverWait(browser, timeout).until(element_present)
     except TimeoutException:
+        browser.close()
         print("Timed out waiting for page to load")
-        raise
-
+        return (fetchedImages, ["Timed out waiting for page to load", 1])
+    except Ewception:
+        print("Unknown error")
+        browser.close()
+        return (fetchedImages, ["Unknown error", 2])
     for x in browser.find_elements_by_xpath("//div[contains(@class, 'result--images')]"):
         name = './image/' + str(keyword) + str(counter)
         url = x.find_element_by_tag_name('a').get_attribute('href')
@@ -65,7 +69,7 @@ def fetchQwantImages(keyword, number=defaultNumberOfImage, mode=0):
             print(e)
             print( "can't get img")
     browser.close()
-    return fetchedImages
+    return (fetchedImages, ["Success", 0])
 
 
 def saveImage(url, outfile):

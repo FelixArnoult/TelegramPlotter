@@ -68,8 +68,8 @@ def build_menu(buttons,
 class DrawingTelegram(object):
     def __init__(self):
         self.PYTHON = '/usr/bin/python3'
-        self.STREAM = os.environ["DRAWING_BOT_STREAM"]
-        # self.STREAM = "./subprocessTest.py"
+        # self.STREAM = os.environ["DRAWING_BOT_STREAM"]
+        self.STREAM = "./subprocessTest.py"
         self.IMAGE_GETTER = './subprocessTest.py'
         self.fileCreated = []
         self.fetchImage_pool = Pool()
@@ -78,32 +78,37 @@ class DrawingTelegram(object):
 
     def fetchImage(self, update, context):
         user = update.message.from_user
-        search_text = context.args[0]
+        search_text = "%20".join(context.args)
         logger.info("User %s search %s", user.first_name, search_text)
-        # print(self.fetchImage_pool.ready())
         if(self.state == AVAILABLE):
             self.state = SEARCHING
             update.message.reply_text('Hmmm, I\'ll see what I can find ...\nLet me few seconds ...')
             callback = lambda result: self.fetchImageDone(update, context, result)
             nbPhoto, searchType = getUserParam(context.user_data, ["NB_DISPLAYED_PHOTO", "SEARCH_TYPE"])
-            print(nbPhoto)
-            print(searchType)
             args = (search_text, nbPhoto, searchType)
-            self.fetchImage_pool.apply_async(getImg.fetchQwantImages, args, callback=callback)
+            r = self.fetchImage_pool.apply_async(getImg.fetchQwantImages, args, callback=callback)
         else:
             update.message.reply_text('Not available')
 
     def fetchImageDone(self, update, context, result):
-        for number, r in enumerate(result):
-            update.message.reply_photo(photo=open('.'.join(r), 'rb'))
-        # update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup([list(map(lambda x: '~'+str(x), range(len(result))))], one_time_keyboard=True))
-        update.message.reply_text('Reply to one of the images with command /print')
-        self.fileCreated.extend(result)
-        self.state = AVAILABLE
+        print(result)
+        if(result[1][1] != 0): #Erreur
+            if(result[1][1] == 1):
+                logger.error("Error during fetch image", result[1])
+                update.message.reply_text('Researsh timed out, try again\nShould change keyword')
+                self.state = AVAILABLE
+            else:
+                update.message.reply_text('Unknown error, try again')
+                self.state = AVAILABLE
+        else :
+            for number, r in enumerate(result[0]):
+                update.message.reply_photo(photo=open('.'.join(r), 'rb'))
+            update.message.reply_text('Reply to one of the images with command /print', reply_markup=ReplyKeyboardMarkup([["/print"]], one_time_keyboard=True))
+            self.fileCreated.extend(result[0])
+            self.state = AVAILABLE
 
     def selectPhoto(self, update, context):
 
-        reply_keyboard = [['UII', 'NOO']]
         if(self.state == AVAILABLE):
             self.state = COMPUTING
             self.fileCreated.extend([["./image/" + str(int(time.time())), 'jpg']])
@@ -113,7 +118,7 @@ class DrawingTelegram(object):
             self.fileCreated.extend(cvtImg.convertImageToSvg(self.fileCreated))
             self.fileCreated.extend(crtGc.writeGcode(self.fileCreated, [[self.fileCreated[-1][0], "gcode"]]))
             update.message.reply_document(document=open(".".join(self.fileCreated[-1]), 'rb'))
-            update.message.reply_text('Select one image to print', reply_markup=ReplyKeyboardMarkup([["/print last"]], one_time_keyboard=True))
+            update.message.reply_text('Select one image to print')
             self.state = AVAILABLE
 
         else:
@@ -150,11 +155,13 @@ def start(self, update, context):
 
 def getPhoto(update):
     if(update.message.reply_to_message):
+        print(update.message.reply_to_message)
         return update.message.reply_to_message.photo[-1].get_file()
     return update.message.photo[-1].get_file()
 
 def getGcode(update):
     if(update.message.reply_to_message):
+        print(update.message.reply_to_message)
         return update.message.reply_to_message.document.get_file()
     return update.message.document.get_file()
 
