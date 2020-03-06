@@ -13,7 +13,7 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
-import subprocessTest
+# import subprocessTest
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from multiprocessing import Pool
 import logging
@@ -21,7 +21,6 @@ import subprocess
 import sys
 import os
 import time
-# the mock-0.3.1 dir contains testcase.py, testutils.py & mock.py
 sys.path.append('../image-getter')
 
 import fetchImageFromQwant as getImg
@@ -68,9 +67,10 @@ def build_menu(buttons,
 class DrawingTelegram(object):
     def __init__(self):
         self.PYTHON = '/usr/bin/python3'
-        # self.STREAM = os.environ["DRAWING_BOT_STREAM"]
-        self.STREAM = "./subprocessTest.py"
+        self.STREAM = os.environ["DRAWING_BOT_STREAM"]
+        # self.STREAM = "./subprocessTest.py"
         self.IMAGE_GETTER = './subprocessTest.py'
+        self.usbPlotter = "/dev/ttyACM0"
         self.fileCreated = []
         self.fetchImage_pool = Pool()
         self.state = AVAILABLE
@@ -130,7 +130,7 @@ class DrawingTelegram(object):
             self.fileCreated.extend([["./image/" + str(int(time.time())), 'gcode']])
             gcode_file = getGcode(update)
             gcode_file.download(".".join(self.fileCreated[-1]))
-            args = (["/usr/bin/python3", self.STREAM, '.'.join(self.fileCreated[-1]), "/dev/ttyACM0"],)
+            args = (["/usr/bin/python3", self.STREAM, '.'.join(self.fileCreated[-1]), self.usbPlotter],)
             update.message.reply_text('Print running ...')
             callback = lambda result: self.printingDone(update, context, result)
             self.fetchImage_pool.apply_async(subprocess.call, args, callback=callback)
@@ -258,7 +258,7 @@ def main():
     myBot = DrawingTelegram()
 
     pp = PicklePersistence(filename='DrawingTelegram')
-    updater = Updater(os.environ["TELEGRAM_TOKER"], persistence=pp, use_context=True)
+    updater = Updater(os.environ["TELEGRAM_TOKEN"], persistence=pp, use_context=True)
     # print(pp.get_user_data())
         # for i in PicklePersistence(filename='DrawingTelegram').get_bot_data():
 
